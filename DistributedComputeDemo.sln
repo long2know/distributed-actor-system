@@ -10,7 +10,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		global.json = global.json
 	EndProjectSection
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "ClusterMaster", "src\WebApplication6\ClusterMaster.xproj", "{92A74429-1555-43F5-91B9-C610DFA10F88}"
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "ClusterMaster", "src\ClusterMaster\ClusterMaster.xproj", "{92A74429-1555-43F5-91B9-C610DFA10F88}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{7F1F65DE-A5CA-44F6-BF5B-6F1EC8A3C928}"
 EndProject
