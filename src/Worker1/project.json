@@ -32,10 +32,7 @@
         "Common": {
           "target": "project"
         },
-        "Microsoft.NETCore.Platforms": "1.0.1-*",
-        "Node.Common": {
-          "target": "project"
-        }
+        "Microsoft.NETCore.Platforms": "1.0.1-*"
       }
     }
   },
