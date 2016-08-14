@@ -54,6 +54,9 @@ namespace Worker1
 
             app.UseStaticFiles();
 
+            // Use our worker node
+            app.UserWorkerNode();
+
             app.UseMvc(routes =>
             {
                 routes.MapRoute(

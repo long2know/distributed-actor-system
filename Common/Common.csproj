@@ -406,6 +406,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="EndpointMappers\NodeEndpoints.cs" />
+    <Compile Include="EndpointMappers\ClusterEndpoints.cs" />
+    <Compile Include="EndpointMappers\IEndpoints.cs" />
     <Compile Include="Controllers.Cluster\StatusController.cs" />
     <Compile Include="Controllers.Cluster\WorkerController.cs" />
     <Compile Include="Controllers.Node\StatusController.cs" />
@@ -419,6 +422,7 @@
     <Compile Include="Models\Cluster.cs" />
     <Compile Include="Messages\ProcessMarket.cs" />
     <Compile Include="Models\Actor.cs" />
+    <Compile Include="Utilities\RequestExtensions.cs" />
     <Compile Include="Utilities\RandomHelper.cs" />
     <Compile Include="Utilities\TaskRepeater.cs" />
     <Compile Include="Messages\WorkerStatusMessage.cs" />

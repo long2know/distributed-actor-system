@@ -107,16 +107,16 @@ namespace Common.Models
         public void Tell<V>(V message)
         {
             _mailbox.Enqueue(message);
-
-            // Run a separate thread to kick off the next process so that any incoming tells
-            // don't wait.
-            Task.Run(() =>
-            {
-                ProcessNextMessage();
-            }, _cancellationToken);
+            MessageFinished();
         }
 
-        private void ProcessNextMessage()
+        private void MessageFinished()
+        {
+            Action finished = () => MessageFinished();
+            ProcessNextMessage(finished);
+        }
+
+        private void ProcessNextMessage(Action finished)
         {
             if (_mailbox.Count > 0 && _handlers.Count > 0 && !IsBusy)
             {
@@ -135,7 +135,7 @@ namespace Common.Models
                         IsBusy = false;
                         if (!IsBusy)
                         {
-                            ProcessNextMessage();
+                            finished();
                         }
                     }
                     catch (Exception ex)

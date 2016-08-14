@@ -1,25 +1,42 @@
 ﻿using System;
+using System.Net;
 using System.Threading;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Common.EndpointMappers;
 using Common.Services;
 using Common.Utilities;
 using Common.Messages;
-using System.Net;
-using System.Text.Encodings.Web;
 
 namespace Common.Models
 {
     public static class NodeExtentions
     {
+        /// <summary>
+        /// Register our Middleware
+        /// </summary>
+        /// <param name="app"></param>
+        public static void UserWorkerNode(this IApplicationBuilder app)
+        {
+            var endpointMapper = app.ApplicationServices.GetRequiredService<IEndpoints>();
+            endpointMapper.MapEndpoints(app);
+        }
+
+        /// <summary>
+        /// Add all worker node dependencies
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
         public static WorkerNode AddWorkerNode(this IServiceCollection services)
         {
             var workerStatus = new WorkerStatus<WorkerStatusMessage>();
             var workerNode = new WorkerNode(workerStatus);
             services.AddSingleton<WorkerNode>(workerNode);
-            services.AddSingleton<IWorkerSatus<WorkerStatusMessage>>(workerStatus);
+            services.AddSingleton<IWorkerStatus<WorkerStatusMessage>>(workerStatus);
             services.AddTransient<IApiService, ApiService>();
+            services.AddTransient<IEndpoints, NodeEndpoints>();
 
             var serviceProvider = workerNode.ServiceProvider = services.BuildServiceProvider();
             var env = serviceProvider.GetRequiredService<IHostingEnvironment>();
@@ -42,7 +59,7 @@ namespace Common.Models
 
     public class WorkerNode
     {
-        private IWorkerSatus<WorkerStatusMessage> _workerStatus;
+        private IWorkerStatus<WorkerStatusMessage> _workerStatus;
         private IServiceProvider _serviceProvider { get; set; }
         private string _hostUrl;
         private string _clusterUrl = "http://localhost:9000";
@@ -50,11 +67,11 @@ namespace Common.Models
         public string HostUrl { set { _hostUrl = value; } }
         public string ClusterUrl { get; set; }
 
-        public WorkerNode(IWorkerSatus<WorkerStatusMessage> workerStatus)
+        public WorkerNode(IWorkerStatus<WorkerStatusMessage> workerStatus)
         {
             _workerStatus = workerStatus;
 
-            var maxActors = 2;
+            var maxActors = 5;
             for (var i = 0; i < maxActors; i++)
             {
                 var actor = new BasicActor();

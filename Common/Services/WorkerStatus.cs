@@ -5,7 +5,7 @@ using Common.Models;
 
 namespace Common.Services
 {
-    public interface IWorkerSatus<T> : IDisposable where T : class
+    public interface IWorkerStatus<T> : IDisposable where T : class
     {
         T CurrentStatus { get; }
         DateTime Date { get; set; }
@@ -25,7 +25,7 @@ namespace Common.Services
         IActor<T> Next { get; }
     }
 
-    public class WorkerStatus<T> : IWorkerSatus<T> where T : class
+    public class WorkerStatus<T> : IWorkerStatus<T> where T : class
     {
         private DateTime _lastTimeReceived;
         private ConcurrentQueue<T> _queue = new ConcurrentQueue<T>();

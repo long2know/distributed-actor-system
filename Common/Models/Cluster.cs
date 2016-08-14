@@ -1,27 +1,44 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
+using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Common.Services;
 using Common.Utilities;
 using Common.Messages;
-using Microsoft.AspNetCore.Hosting;
+using Common.EndpointMappers;
 
 namespace Common.Models
 {
     public static class ClusterExtensions
     {
+        /// <summary>
+        /// Register our Middleware
+        /// </summary>
+        /// <param name="app"></param>
+        public static void UseCluster(this IApplicationBuilder app)
+        {
+            var endpointMapper = app.ApplicationServices.GetRequiredService<IEndpoints>();
+            endpointMapper.MapEndpoints(app);
+        }
+
+        /// <summary>
+        /// Add cluster dependencies and instantiate the cluster
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
         public static Cluster AddCluster(this IServiceCollection services)
         {
             var workerStatus = new WorkerStatus<WorkerStatusMessage>();
             var cluster = new Cluster(workerStatus);
             services.AddSingleton<Cluster>(cluster);
-            services.AddSingleton<IWorkerSatus<WorkerStatusMessage>>(workerStatus);
+            services.AddSingleton<IWorkerStatus<WorkerStatusMessage>>(workerStatus);
             services.AddTransient<IApiService, ApiService>();
+            services.AddTransient<IEndpoints, ClusterEndpoints>();
 
             var serviceProvider = cluster.ServiceProvider = services.BuildServiceProvider();
-
             var lifetime = serviceProvider.GetRequiredService<IApplicationLifetime>();
             lifetime.ApplicationStarted.Register(cluster.Started);
             lifetime.ApplicationStopping.Register(cluster.Stopping);
@@ -35,15 +52,17 @@ namespace Common.Models
     /// </summary>
     public class Cluster : BasicActor
     {
-        private IWorkerSatus<WorkerStatusMessage> _workerStatus;
+        private IWorkerStatus<WorkerStatusMessage> _workerStatus;
         private IServiceProvider _serviceProvider { get; set; }
 
         private ConcurrentDictionary<string, string> _availableNodes = new ConcurrentDictionary<string, string>();
         private ConcurrentDictionary<Guid, object> _outbox = new ConcurrentDictionary<Guid, object>();
         public IServiceProvider ServiceProvider { set { _serviceProvider = value; } }
         private int _lastIndex = 0;
-
-        public Cluster(IWorkerSatus<WorkerStatusMessage> workerStatus)
+        private long _perfCounter = 0;
+        private DateTime _startTime = DateTime.UtcNow;
+                 
+        public Cluster(IWorkerStatus<WorkerStatusMessage> workerStatus)
         {
             _workerStatus = workerStatus;
 
@@ -97,10 +116,17 @@ namespace Common.Models
         public void Started()
         {
             var cancellationTokenSource = new CancellationTokenSource();
+            var firstRun = true;
             TaskRepeater.Interval(TimeSpan.FromMilliseconds(50), () =>
             {
                 if ((_availableNodes?.Count ?? 0) > 0)
                 {
+                   if (firstRun)
+                    {
+                        _startTime = DateTime.UtcNow;
+                        firstRun = false;
+                    }
+                    _perfCounter++;
                     var random = new Random();
                     var nodeHost = this.NextNode;
 
@@ -117,6 +143,11 @@ namespace Common.Models
                             TellNodeToStart(nodeHost);
                         }
                     }
+
+                    TimeSpan span = DateTime.UtcNow - _startTime;
+                    long msPerRequest = (int)span.TotalMilliseconds / _perfCounter;
+                    Console.WriteLine(msPerRequest);
+
                 }
             }, cancellationTokenSource.Token, true);
         }
@@ -130,19 +161,6 @@ namespace Common.Models
         {
             // Perform some cleanup?
         }
-
-        //private void ReceivedNodeReady(NodeReady nodeReady)
-        //{
-        //    _workerStatus.AddCallback("cluster", action =>
-        //    {
-        //        if (action.Message.Contains("WorkerReady:"))
-        //        {
-        //            var ipAddress = action.Message.Replace("WorkerReady: ", string.Empty);
-        //            _availableNodes.TryAdd(ipAddress, ipAddress);
-        //        }
-        //        Console.WriteLine(action.TimeStamp);
-        //    });
-        //}
 
         private void TellNodeToStart(string nodeHost)
         {
