@@ -47,6 +47,7 @@ namespace Common.Models
         private ConcurrentDictionary<string, Action<T>> _actions = new ConcurrentDictionary<string, Action<T>>();
         private ConcurrentQueue<object> _mailbox = new ConcurrentQueue<object>();
         private object _lockObj = new object();
+        private object _lockCheck = new object();
 
         /// <summary>
         /// Thread-safe busy indicator
@@ -118,33 +119,39 @@ namespace Common.Models
 
         private void ProcessNextMessage(Action finished)
         {
-            if (_mailbox.Count > 0 && _handlers.Count > 0 && !IsBusy)
+            // Using the lockcheck so that multiple messages don't get processed
+            // We should come out of the lock quickly since the working code is a seperate
+            // task.
+            lock (_lockCheck)
             {
-                IsBusy = true;
-                object message = null;
-                _mailbox.TryDequeue(out message);
-                Action<object> handler = null;
-                var key = message.GetType();
-                _handlers.TryGetValue(key, out handler);
-
-                var task = new Task(() =>
+                if (_mailbox.Count > 0 && _handlers.Count > 0 && !IsBusy)
                 {
-                    try
+                    IsBusy = true;
+                    object message = null;
+                    _mailbox.TryDequeue(out message);
+                    Action<object> handler = null;
+                    var key = message.GetType();
+                    _handlers.TryGetValue(key, out handler);
+
+                    // Spawn task to perform the wait.
+                    var task = new Task(() =>
                     {
-                        handler(message);
-                        IsBusy = false;
-                        if (!IsBusy)
+                        try
                         {
+                            handler(message);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(ex);
+                        }
+                        finally
+                        {
+                            IsBusy = false;
                             finished();
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        IsBusy = false;
-                        Console.WriteLine(ex);
-                    }
-                }, _cancellationToken);
-                task.Start();
+                    }, _cancellationToken);
+                    task.Start();
+                }
             }
         }
     }
@@ -159,24 +166,34 @@ namespace Common.Models
 
             Receive<StartJob>(job =>
             {
-                Task.Run(() =>
+                var task = Task.Run(() =>
                 {
                     StartJob(job);
                     WorkerStatusMessage message = new WorkerStatusMessage() { TaskId = job.TaskId, Message = "Complete" };
                     AddStatus(message);
                     Callback(message);
                 }, _cancellationToken);
+
+                // Wait for the task to finish so that the calling
+                // task (ProcessMessage) will not continue processing other messages
+                // until this work is done.
+                task.Wait();
             });
 
             Receive<ProcessMarket>(job =>
             {
-                Task.Run(() =>
+                var task = Task.Run(() =>
                 {
                     ProcessMarket(job);
                     WorkerStatusMessage message = new WorkerStatusMessage() { TaskId = job.TaskId, Message = "Complete" };
                     AddStatus(message);
                     Callback(message);
                 }, _cancellationToken);
+
+                // Wait for the task to finish so that the calling
+                // task (ProcessMessage) will not continue processing other messages
+                // until this work is done.
+                task.Wait();
             });
         }
 
